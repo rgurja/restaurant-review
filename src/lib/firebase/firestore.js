@@ -1,5 +1,5 @@
 // import helper which generates fake restaurants and reviews for testing
-import { generateFakeRestaurantsAndReviews } from "@/src/lib/fakeRestaurants.js";
+import { generateFakeRestaurantsAndReviews } from "@/src/lib/fakeRestaurants.js"; // helper to create demo data
 
 // import Firestore functions used throughout this module
 import {
@@ -19,20 +19,20 @@ import {
   updateDoc,
   // order query results
   orderBy,
-  // Firestore timestamp type (unused here but imported)
+  // Firestore timestamp type (used below to construct timestamps)
   Timestamp,
-  // run a transaction (unused placeholder)
+  // run a transaction
   runTransaction,
   // add where filters to queries
   where,
   // add a new document
   addDoc,
-  // get a Firestore instance (unused here but imported)
+  // get a Firestore instance (not used directly here)
   getFirestore,
 } from "firebase/firestore";
 
 // import the client-side Firestore database instance
-import { db } from "@/src/lib/firebase/clientApp";
+import { db } from "@/src/lib/firebase/clientApp"; // application's Firestore client
 
 // update the photo URL field for a restaurant document
 export async function updateRestaurantImageReference(
@@ -49,30 +49,38 @@ export async function updateRestaurantImageReference(
   }
 }
 
+// helper to update rating totals inside a transaction and add the review document
 const updateWithRating = async (
   transaction,
   docRef,
   newRatingDocument,
   review
 ) => {
+  // read the restaurant document inside the transaction
   const restaurant = await transaction.get(docRef);
-  const data = restaurant.data();
+  const data = restaurant.data(); // existing data for the restaurant
+  // compute the new number of ratings (increment or set to 1)
   const newNumRatings = data?.numRatings ? data.numRatings + 1 : 1;
+  // compute the new sum of ratings
   const newSumRating = (data?.sumRating || 0) + Number(review.rating);
+  // compute the new average rating
   const newAverage = newSumRating / newNumRatings;
 
+  // update the restaurant totals in the transaction
   transaction.update(docRef, {
     numRatings: newNumRatings,
     sumRating: newSumRating,
     avgRating: newAverage,
   });
 
+  // add the review document into the ratings subcollection with a timestamp
   transaction.set(newRatingDocument, {
     ...review,
     timestamp: Timestamp.fromDate(new Date()),
   });
 };
 
+// add a review to a restaurant using a transaction to update totals and create the rating doc
 export async function addReviewToRestaurant(db, restaurantId, review) {
         if (!restaurantId) {
                 throw new Error("No restaurant ID has been provided.");
@@ -83,12 +91,14 @@ export async function addReviewToRestaurant(db, restaurantId, review) {
         }
 
         try {
+                // build a reference to the restaurant document
                 const docRef = doc(collection(db, "restaurants"), restaurantId);
+                // prepare a new document reference inside the ratings subcollection
                 const newRatingDocument = doc(
                         collection(db, `restaurants/${restaurantId}/ratings`)
                 );
 
-                // corrected line
+                // run the transaction which updates totals and writes the review
                 await runTransaction(db, transaction =>
                         updateWithRating(transaction, docRef, newRatingDocument, review)
                 );
@@ -111,7 +121,7 @@ function applyQueryFilters(q, { category, city, price, sort }) {
   if (city) {
     q = query(q, where("city", "==", city));
   }
-  // filter by price using the length of the price string (existing code)
+  // filter by price using the length of the price string (existing code expects price to be like '$$')
   if (price) {
     q = query(q, where("price", "==", price.length));
   }
