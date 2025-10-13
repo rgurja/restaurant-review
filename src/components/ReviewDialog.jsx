@@ -30,7 +30,7 @@ const ReviewDialog = ({
     if (e.target === dialog.current) {
       handleClose();
     }
-  };
+  };   
 
   return (
     <dialog ref={dialog} onMouseDown={handleClick}>
